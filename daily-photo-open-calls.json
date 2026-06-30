@@ -1,0 +1,220 @@
+{
+  "name": "Daily Free Photography Open Calls",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1b0abced-60dc-4470-a8d2-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "1b0abced-60dc-4470-a8d2-000000000002",
+      "name": "Daily 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "daily-config-notes",
+              "name": "CONFIG_NOTES",
+              "value": "Source-first workflow. Daily direct HTTP checks use Airtable Sources and cost no search credits. Discovery uses Brave first, then optional SerpAPI, then optional Tavily. Recommended: DISCOVERY_MODE weekly, DISCOVERY_QUERY_LIMIT 1-3, SOURCE_RECHECK_LIMIT 5-20, OPEN_CALL_MAX_CANDIDATES 3-20.",
+              "type": "string"
+            },
+            {
+              "id": "daily-brave-search-api-key",
+              "name": "BRAVE_SEARCH_API_KEY",
+              "value": "PASTE_BRAVE_SEARCH_API_KEY_HERE",
+              "type": "string"
+            },
+            {
+              "id": "daily-serpapi-api-key",
+              "name": "SERPAPI_API_KEY",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "daily-tavily-api-key",
+              "name": "TAVILY_API_KEY",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "daily-gemini-api-key",
+              "name": "GEMINI_API_KEY",
+              "value": "PASTE_GEMINI_API_KEY_HERE",
+              "type": "string"
+            },
+            {
+              "id": "daily-gemini-model",
+              "name": "GEMINI_MODEL",
+              "value": "gemini-3.1-flash-lite",
+              "type": "string"
+            },
+            {
+              "id": "daily-airtable-api-key",
+              "name": "AIRTABLE_API_KEY",
+              "value": "PASTE_AIRTABLE_PERSONAL_ACCESS_TOKEN_HERE",
+              "type": "string"
+            },
+            {
+              "id": "daily-airtable-base-id",
+              "name": "AIRTABLE_BASE_ID",
+              "value": "PASTE_AIRTABLE_BASE_ID_HERE",
+              "type": "string"
+            },
+            {
+              "id": "daily-confidence-threshold",
+              "name": "OPEN_CALL_CONFIDENCE_THRESHOLD",
+              "value": 0.75,
+              "type": "number"
+            },
+            {
+              "id": "daily-results-per-query",
+              "name": "OPEN_CALL_RESULTS_PER_QUERY",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "daily-discovery-mode",
+              "name": "DISCOVERY_MODE",
+              "value": "weekly",
+              "type": "string"
+            },
+            {
+              "id": "daily-discovery-query-limit",
+              "name": "DISCOVERY_QUERY_LIMIT",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "daily-min-results-before-fallback",
+              "name": "MIN_RESULTS_BEFORE_FALLBACK",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "daily-source-recheck-limit",
+              "name": "SOURCE_RECHECK_LIMIT",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "daily-direct-link-limit-per-source",
+              "name": "DIRECT_LINK_LIMIT_PER_SOURCE",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "daily-max-candidates",
+              "name": "OPEN_CALL_MAX_CANDIDATES",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "daily-ai-max-requests-per-run",
+              "name": "AI_MAX_REQUESTS_PER_RUN",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "daily-ai-time-budget",
+              "name": "AI_TIME_BUDGET_MS",
+              "value": 240000,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1b0abced-60dc-4470-a8d2-000000000004",
+      "name": "Open Calls Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst config = $input.first().json || {};\nconst required = ['GEMINI_API_KEY', 'AIRTABLE_API_KEY', 'AIRTABLE_BASE_ID'];\nconst missing = required.filter((name) => !config[name] || String(config[name]).startsWith('PASTE_'));\nif (missing.length) {\n  throw new Error('Fill these fields in the \"Open Calls Config\" node: ' + missing.join(', '));\n}\n\nconst BRAVE_SEARCH_API_KEY = config.BRAVE_SEARCH_API_KEY || '';\nconst SERPAPI_API_KEY = config.SERPAPI_API_KEY || '';\nconst TAVILY_API_KEY = config.TAVILY_API_KEY || '';\nconst GEMINI_API_KEY = config.GEMINI_API_KEY;\nconst AIRTABLE_API_KEY = config.AIRTABLE_API_KEY;\nconst AIRTABLE_BASE_ID = config.AIRTABLE_BASE_ID;\nconst httpRequest = this.helpers.httpRequest.bind(this);\nconst TODAY = new Date().toISOString().slice(0, 10);\n\nif (!/^app[a-zA-Z0-9]+$/.test(AIRTABLE_BASE_ID)) {\n  throw new Error('AIRTABLE_BASE_ID must be the Airtable base id from the base URL. It should start with \"app\", for example appXXXXXXXXXXXXXX. Current value: ' + AIRTABLE_BASE_ID);\n}\nconst CONFIRMED_THRESHOLD = Number(config.OPEN_CALL_CONFIDENCE_THRESHOLD || 0.75);\nconst MAX_RESULTS_PER_QUERY = Number(config.OPEN_CALL_RESULTS_PER_QUERY || 8);\nconst MAX_CANDIDATES = Number(config.OPEN_CALL_MAX_CANDIDATES || 5);\nconst DISCOVERY_MODE = String(config.DISCOVERY_MODE || 'weekly').toLowerCase();\nconst DISCOVERY_QUERY_LIMIT = Number(config.DISCOVERY_QUERY_LIMIT || 3);\nconst MIN_RESULTS_BEFORE_FALLBACK = Number(config.MIN_RESULTS_BEFORE_FALLBACK || 3);\nconst SOURCE_RECHECK_LIMIT = Number(config.SOURCE_RECHECK_LIMIT || 10);\nconst DIRECT_LINK_LIMIT_PER_SOURCE = Number(config.DIRECT_LINK_LIMIT_PER_SOURCE || 8);\nconst AI_MODEL = config.GEMINI_MODEL || 'gemini-3.1-flash-lite';\nconst AI_MAX_REQUESTS_PER_RUN = Number(config.AI_MAX_REQUESTS_PER_RUN || 8);\nconst AI_TIME_BUDGET_MS = Number(config.AI_TIME_BUDGET_MS || 240000);\nconst RUN_STARTED_AT = Date.now();\nlet aiRequestsUsed = 0;\n\nconst searchQueries = [\n  'free photography open call online submission deadline',\n  'photography submissions no entry fee open call deadline',\n  'international photography open call free entry photographers',\n  'photo contest free entry deadline online submission',\n  'museum photography open call photographers free submission',\n  'gallery photography open call no entry fee deadline',\n  'photography festival open call free submission deadline',\n  'Picter photography open call free submission deadline',\n  'PhotoVogue photography open call submissions deadline',\n  'ArtConnect photography open call free entry deadline',\n];\n\nconst knownSourceHints = [\n  'picter.com',\n  'vogue.com',\n  'artconnect.com',\n  'lensculture.com',\n  'photocontestinsider.com',\n  'photocontestdeadlines.com',\n  'worldphoto.org',\n  'phmuseum.com',\n  'aperture.org',\n  'foam.org',\n];\n\nconst rejectHostFragments = [\n  'facebook.com/login',\n  'instagram.com/accounts/login',\n  'pinterest.',\n  'reddit.com',\n  'x.com',\n  'twitter.com',\n  'youtube.com',\n  'tiktok.com',\n];\n\nasync function requestJson(url, options = {}) {\n  const requestOptions = {\n    method: options.method || 'GET',\n    url,\n    headers: options.headers || {},\n    json: true,\n  };\n  if (options.body) {\n    requestOptions.body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;\n  }\n  try {\n    return await httpRequest(requestOptions);\n  } catch (error) {\n    throw new Error('HTTP request failed for ' + url + ': ' + (error.message || String(error)));\n  }\n}\n\nfunction canonicalize(input) {\n  let text = String(input || '').trim();\n  if (!text) return '';\n  text = text.split('#')[0];\n  const queryIndex = text.indexOf('?');\n  const base = queryIndex >= 0 ? text.slice(0, queryIndex) : text;\n  const query = queryIndex >= 0 ? text.slice(queryIndex + 1) : '';\n  const keptParams = [];\n  const dropPrefixes = ['utm_', 'fbclid', 'gclid', 'mc_cid', 'mc_eid', 'igshid'];\n  for (const part of query.split('&')) {\n    if (!part) continue;\n    const key = part.split('=')[0] || '';\n    if (dropPrefixes.some((prefix) => key === prefix || key.startsWith(prefix))) continue;\n    keptParams.push(part);\n  }\n  const normalizedBase = base\n    .replace(/^(https?:\\/\\/)www\\./i, '$1')\n    .replace(/^(https?:\\/\\/[^/]+)$/i, '$1/')\n    .replace(/\\/+$/g, '');\n  return normalizedBase + (keptParams.length ? '?' + keptParams.join('&') : '');\n}\n\nfunction domainOf(input) {\n  const match = String(input || '').match(/^[a-z]+:\\/\\/([^/?#]+)/i);\n  return match ? match[1].toLowerCase().replace(/^www\\./, '') : '';\n}\n\nfunction fallbackKey(title, deadline, domain) {\n  return [\n    String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 120),\n    deadline || '',\n    domain || '',\n  ].join('|');\n}\n\nfunction sourceType(url) {\n  const host = domainOf(url);\n  if (host.includes('instagram') || host.includes('facebook')) return 'Social indexed';\n  if (host.includes('museum')) return 'Museum';\n  if (host.includes('gallery')) return 'Gallery';\n  if (host.includes('festival')) return 'Festival';\n  if (knownSourceHints.some((hint) => host.includes(hint))) return 'Aggregator';\n  return 'Search result';\n}\n\nfunction normalizeDate(value) {\n  if (!value) return null;\n  const parsed = new Date(value);\n  if (Number.isNaN(parsed.getTime())) return null;\n  return parsed.toISOString().slice(0, 10);\n}\n\nfunction isPastDate(dateString) {\n  if (!dateString) return false;\n  return dateString < TODAY;\n}\n\nfunction truncate(value, max) {\n  const text = String(value || '').replace(/\\s+/g, ' ').trim();\n  return text.length > max ? text.slice(0, max - 1) + '...' : text;\n}\n\nfunction sleep(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nfunction remainingRunMs() {\n  return AI_TIME_BUDGET_MS - (Date.now() - RUN_STARTED_AT);\n}\n\nfunction ensureRunBudget() {\n  if (remainingRunMs() <= 0) {\n    throw new Error('AI time budget exhausted before n8n 300s task timeout');\n  }\n  if (aiRequestsUsed >= AI_MAX_REQUESTS_PER_RUN) {\n    throw new Error('AI request budget exhausted for this run');\n  }\n}\n\nfunction shouldRunDiscovery() {\n  if (DISCOVERY_MODE === 'daily') return true;\n  if (DISCOVERY_MODE === 'manual') return false;\n  if (DISCOVERY_MODE === 'weekly') return new Date().getDay() === 1;\n  return false;\n}\n\nasync function braveSearch(query) {\n  if (!BRAVE_SEARCH_API_KEY || String(BRAVE_SEARCH_API_KEY).startsWith('PASTE_')) return [];\n  const body = await requestJson('https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=' + encodeURIComponent(String(MAX_RESULTS_PER_QUERY)), {\n    method: 'GET',\n    headers: {\n      Accept: 'application/json',\n      'X-Subscription-Token': BRAVE_SEARCH_API_KEY,\n    },\n  });\n  return ((body.web && body.web.results) || []).map((result) => ({\n    title: result.title || '',\n    url: result.url || '',\n    snippet: result.description || result.extra_snippets && result.extra_snippets.join(' ') || '',\n    provider: 'Brave',\n    score: 0,\n  }));\n}\n\nasync function serpApiSearch(query) {\n  if (!SERPAPI_API_KEY || String(SERPAPI_API_KEY).startsWith('PASTE_')) return [];\n  const body = await requestJson('https://serpapi.com/search.json?engine=google&q=' + encodeURIComponent(query) + '&num=' + encodeURIComponent(String(MAX_RESULTS_PER_QUERY)) + '&api_key=' + encodeURIComponent(SERPAPI_API_KEY), {\n    method: 'GET',\n  });\n  return (body.organic_results || []).map((result) => ({\n    title: result.title || '',\n    url: result.link || '',\n    snippet: result.snippet || '',\n    provider: 'SerpAPI',\n    score: result.position ? 1 / result.position : 0,\n  }));\n}\n\nasync function tavilySearch(query) {\n  if (!TAVILY_API_KEY || String(TAVILY_API_KEY).startsWith('PASTE_')) return [];\n  return requestJson('https://api.tavily.com/search', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({\n      api_key: TAVILY_API_KEY,\n      query,\n      search_depth: 'advanced',\n      max_results: MAX_RESULTS_PER_QUERY,\n      include_answer: false,\n      include_raw_content: false,\n      topic: 'general',\n      days: 30,\n    }),\n  }).then((body) => (body.results || []).map((result) => ({\n    title: result.title || '',\n    url: result.url || '',\n    snippet: result.content || result.snippet || '',\n    provider: 'Tavily',\n    score: result.score || 0,\n  })));\n}\n\nasync function providerSearch(query) {\n  let results = [];\n  try {\n    results = await braveSearch(query);\n  } catch (error) {\n    results = [];\n  }\n  if (results.length >= MIN_RESULTS_BEFORE_FALLBACK) return results;\n\n  try {\n    const fallback = await serpApiSearch(query);\n    if (fallback.length) results = results.concat(fallback);\n  } catch (error) {}\n  if (results.length >= MIN_RESULTS_BEFORE_FALLBACK) return results;\n\n  try {\n    const fallback = await tavilySearch(query);\n    if (fallback.length) results = results.concat(fallback);\n  } catch (error) {}\n  return results;\n}\n\nasync function httpFallbackText(url) {\n  try {\n    const text = await httpRawText(url);\n    return truncate(text\n      .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n      .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n      .replace(/<[^>]+>/g, ' ')\n      .replace(/&nbsp;/g, ' ')\n      .replace(/&amp;/g, '&'), 12000);\n  } catch {\n    return '';\n  }\n}\n\nasync function httpRawText(url) {\n  return httpRequest({\n      method: 'GET',\n      url,\n      headers: {\n        'User-Agent': 'Mozilla/5.0 n8n photography open call monitor',\n        Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',\n      },\n      json: false,\n    });\n}\n\nfunction absoluteUrl(href, baseUrl) {\n  const value = String(href || '').trim();\n  if (!value || value.startsWith('#') || value.startsWith('mailto:') || value.startsWith('tel:') || value.startsWith('javascript:')) return '';\n  if (/^https?:\\/\\//i.test(value)) return value;\n  const baseMatch = String(baseUrl || '').match(/^(https?:\\/\\/[^/]+)(\\/.*)?$/i);\n  if (!baseMatch) return '';\n  if (value.startsWith('/')) return baseMatch[1] + value;\n  const basePath = (baseMatch[2] || '/').replace(/\\/[^/]*$/, '/');\n  return baseMatch[1] + basePath + value;\n}\n\nfunction extractCandidateLinks(html, sourceUrl) {\n  const out = [];\n  const seen = {};\n  const pattern = /<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi;\n  let match;\n  while ((match = pattern.exec(String(html || ''))) && out.length < DIRECT_LINK_LIMIT_PER_SOURCE) {\n    const href = absoluteUrl(match[1], sourceUrl);\n    const text = match[2].replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim();\n    const combined = (href + ' ' + text).toLowerCase();\n    const looksRelevant = /open.?call|call.?for.?entry|submission|submit|deadline|photography|photo|contest|award|grant|opportunit/.test(combined);\n    if (!href || seen[canonicalize(href)] || !looksRelevant) continue;\n    seen[canonicalize(href)] = true;\n    out.push({\n      query: 'direct-source',\n      title: text || href,\n      url: href,\n      canonical: canonicalize(href),\n      snippet: text,\n      provider: 'Direct',\n      score: 0,\n    });\n  }\n  return out;\n}\n\nasync function extractWithGemini(candidate, pageText) {\n  const system = [\n    'You extract and classify photography open calls for an Airtable automation.',\n    'Return strict JSON only. Do not use markdown.',\n    'The user wants current, free-to-submit photography/photo/video/multimedia visual open calls with electronic submission.',\n    'Required fees disqualify. Optional donations, sales commissions, and non-required production costs do not disqualify.',\n    'If deadline is missing or unclear, set deadline to null and explain in rejection_reason.',\n  ].join(' ');\n  const user = JSON.stringify({\n    today: TODAY,\n    url: candidate.url,\n    title: candidate.title,\n    searchSnippet: candidate.snippet,\n    pageText,\n    expectedSchema: {\n      title: 'string',\n      is_photo_open_call: 'boolean',\n      is_free: 'boolean',\n      is_online_submission: 'boolean',\n      deadline: 'YYYY-MM-DD or null',\n      summary: '1-3 concise sentences',\n      fee_status: 'Free | No required fee | Unknown | Paid required fee',\n      submission_type: 'Online | Email | Platform | Unknown',\n      confidence: 'number 0..1',\n      rejection_reason: 'string or empty',\n    },\n  });\n  const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(AI_MODEL) + ':generateContent';\n  const responseSchema = {\n    type: 'OBJECT',\n    properties: {\n      title: { type: 'STRING' },\n      is_photo_open_call: { type: 'BOOLEAN' },\n      is_free: { type: 'BOOLEAN' },\n      is_online_submission: { type: 'BOOLEAN' },\n      deadline: { type: 'STRING', nullable: true },\n      summary: { type: 'STRING' },\n      fee_status: { type: 'STRING', enum: ['Free', 'No required fee', 'Unknown', 'Paid required fee'] },\n      submission_type: { type: 'STRING', enum: ['Online', 'Email', 'Platform', 'Unknown'] },\n      confidence: { type: 'NUMBER' },\n      rejection_reason: { type: 'STRING' },\n    },\n    required: [\n      'title',\n      'is_photo_open_call',\n      'is_free',\n      'is_online_submission',\n      'deadline',\n      'summary',\n      'fee_status',\n      'submission_type',\n      'confidence',\n      'rejection_reason',\n    ],\n  };\n\n  ensureRunBudget();\n  aiRequestsUsed += 1;\n  const body = await requestJson(endpoint, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'x-goog-api-key': GEMINI_API_KEY,\n    },\n    body: JSON.stringify({\n      contents: [\n        {\n          role: 'user',\n          parts: [\n            { text: system + '\\n\\nInput:\\n' + user },\n          ],\n        },\n      ],\n      generationConfig: {\n        temperature: 0,\n        response_mime_type: 'application/json',\n        response_schema: responseSchema,\n      },\n    }),\n  });\n  const content = body.candidates\n    && body.candidates[0]\n    && body.candidates[0].content\n    && body.candidates[0].content.parts\n    && body.candidates[0].content.parts[0]\n    && body.candidates[0].content.parts[0].text;\n  return parseJsonFromModel(content || '{}');\n}\n\nfunction parseJsonFromModel(content) {\n  let text = String(content || '').trim();\n  const fence = String.fromCharCode(96, 96, 96);\n  if (text.startsWith(fence)) {\n    text = text.replace(new RegExp('^' + fence + '(?:json)?', 'i'), '').replace(new RegExp(fence + '$', 'i'), '').trim();\n  }\n  try {\n    return JSON.parse(text);\n  } catch (error) {\n    const objectText = firstBalancedJsonObject(text);\n    if (objectText) return JSON.parse(objectText);\n    throw error;\n  }\n}\n\nfunction firstBalancedJsonObject(text) {\n  const start = text.indexOf('{');\n  if (start < 0) return '';\n  let depth = 0;\n  let inString = false;\n  let escaped = false;\n  for (let index = start; index < text.length; index++) {\n    const char = text[index];\n    if (escaped) {\n      escaped = false;\n      continue;\n    }\n    if (char === '\\\\') {\n      escaped = true;\n      continue;\n    }\n    if (char === '\"') {\n      inString = !inString;\n      continue;\n    }\n    if (inString) continue;\n    if (char === '{') depth += 1;\n    if (char === '}') {\n      depth -= 1;\n      if (depth === 0) return text.slice(start, index + 1);\n    }\n  }\n  return '';\n}\n\nasync function airtable(path, options = {}) {\n  return requestJson('https://api.airtable.com/v0/' + AIRTABLE_BASE_ID + path, {\n    ...options,\n    headers: {\n      Authorization: 'Bearer ' + AIRTABLE_API_KEY,\n      'Content-Type': 'application/json',\n      ...(options.headers || {}),\n    },\n  });\n}\n\nasync function listAirtableRecords(tableName, filterByFormula) {\n  const records = [];\n  let offset = undefined;\n  do {\n    const params = ['pageSize=100'];\n    if (filterByFormula) params.push('filterByFormula=' + encodeURIComponent(filterByFormula));\n    if (offset) params.push('offset=' + encodeURIComponent(offset));\n    const body = await airtable('/' + encodeURIComponent(tableName) + '?' + params.join('&'), { method: 'GET' });\n    records.push(...(body.records || []));\n    offset = body.offset;\n  } while (offset);\n  return records;\n}\n\nasync function batchPatch(tableName, records, mergeField) {\n  const chunks = [];\n  for (let i = 0; i < records.length; i += 10) chunks.push(records.slice(i, i + 10));\n  const responses = [];\n  for (const chunk of chunks) {\n    const body = { records: chunk };\n    if (mergeField) body.performUpsert = { fieldsToMergeOn: [mergeField] };\n    responses.push(await airtable('/' + encodeURIComponent(tableName), {\n      method: 'PATCH',\n      body: JSON.stringify(body),\n    }));\n  }\n  return responses;\n}\n\nfunction stripSourceTrackingFields(record) {\n  const fields = { ...(record.fields || {}) };\n  delete fields['Last Discovery Checked'];\n  delete fields['Last Direct Checked'];\n  delete fields['Discovery Provider'];\n  delete fields['Provider Cost Class'];\n  return { ...record, fields };\n}\n\nasync function batchPatchSources(records, mergeField) {\n  try {\n    return await batchPatch('Sources', records, mergeField);\n  } catch (error) {\n    const message = error.message || String(error);\n    if (!message.includes('422')) throw error;\n    try {\n      return await batchPatch('Sources', records.map(stripSourceTrackingFields), mergeField);\n    } catch (fallbackError) {\n      throw new Error('Airtable rejected Sources update even after removing optional tracking fields. Run setup-airtable.json once to create the latest Sources schema. Original error: ' + message + '. Fallback error: ' + (fallbackError.message || String(fallbackError)));\n    }\n  }\n}\n\nconst allOpenCallRecords = await listAirtableRecords('Open Calls');\nconst existingOpenCallsByCanonical = new Map();\nconst existingOpenCallsByFallback = new Map();\nfor (const record of allOpenCallRecords) {\n  const fields = record.fields || {};\n  if (fields['Canonical URL']) existingOpenCallsByCanonical.set(canonicalize(fields['Canonical URL']), record);\n  const key = fallbackKey(fields.Title, fields.Deadline, fields.Source);\n  if (key !== '||') existingOpenCallsByFallback.set(key, record);\n}\n\nconst allSourceRecords = await listAirtableRecords('Sources');\nconst existingSourcesByKey = new Map();\nfor (const record of allSourceRecords) {\n  const fields = record.fields || {};\n  const key = fields['Source Key'] || fields.Domain;\n  if (key) existingSourcesByKey.set(key, record);\n}\n\nconst expiredCandidates = allOpenCallRecords.filter((record) => {\n  const status = record.fields && record.fields.Status;\n  return status === 'Active' || status === 'Needs review';\n});\nconst expiredUpdates = expiredCandidates\n  .filter((record) => isPastDate(record.fields && record.fields.Deadline))\n  .map((record) => ({ id: record.id, fields: { Status: 'Expired', 'Last Checked': TODAY } }));\nif (expiredUpdates.length) await batchPatch('Open Calls', expiredUpdates);\n\nconst activeSources = allSourceRecords\n  .filter((record) => {\n    const fields = record.fields || {};\n    return (fields.Status === 'Approved' || fields.Status === 'Candidate') && fields['Source URL'];\n  })\n  .slice(0, SOURCE_RECHECK_LIMIT);\n\nconst sourceDirectUpdates = [];\nconst directSourceResults = [];\nfor (const sourceRecord of activeSources) {\n  const fields = sourceRecord.fields || {};\n  const sourceUrl = fields['Source URL'];\n  directSourceResults.push({\n    query: 'direct-source',\n    title: fields.Domain || sourceUrl,\n    url: sourceUrl,\n    canonical: canonicalize(sourceUrl),\n    snippet: 'Known Airtable source direct recheck',\n    provider: 'Direct',\n    score: 0,\n  });\n  try {\n    const html = await httpRawText(sourceUrl);\n    directSourceResults.push(...extractCandidateLinks(html, sourceUrl));\n    sourceDirectUpdates.push({\n      id: sourceRecord.id,\n      fields: {\n        'Last Direct Checked': TODAY,\n        'Discovery Provider': 'Direct',\n        'Provider Cost Class': 'Free direct HTTP',\n      },\n    });\n  } catch (error) {\n    sourceDirectUpdates.push({\n      id: sourceRecord.id,\n      fields: {\n        'Last Direct Checked': TODAY,\n      },\n    });\n  }\n}\nif (sourceDirectUpdates.length) await batchPatchSources(sourceDirectUpdates);\n\nconst discoveryResults = [];\nconst discoveryShouldRun = DISCOVERY_MODE !== 'manual' && (shouldRunDiscovery() || activeSources.length === 0);\nif (discoveryShouldRun && DISCOVERY_QUERY_LIMIT > 0) {\n  for (const query of searchQueries.slice(0, DISCOVERY_QUERY_LIMIT)) {\n    const results = await providerSearch(query);\n    for (const result of results) {\n      const url = result.url || '';\n      const canonical = canonicalize(url);\n      if (!url || rejectHostFragments.some((fragment) => canonical.includes(fragment))) continue;\n      discoveryResults.push({\n        query,\n        title: result.title || '',\n        url,\n        canonical,\n        snippet: result.snippet || '',\n        provider: result.provider || 'Search',\n        score: result.score || 0,\n      });\n    }\n  }\n}\n\nconst searchResults = directSourceResults.concat(discoveryResults);\n\nconst byCanonical = new Map();\nfor (const result of searchResults) {\n  if (!byCanonical.has(result.canonical)) byCanonical.set(result.canonical, result);\n}\nconst candidates = [...byCanonical.values()].slice(0, MAX_CANDIDATES);\n\nconst openCallUpserts = [];\nconst openCallUpdates = [];\nconst sourceRecordsByKey = new Map();\nconst rejected = [];\nlet aiRateLimitFailures = 0;\nlet aiDisabledReason = '';\n\nfunction queueSource(candidate, status, confidence) {\n  const domain = domainOf(candidate.url);\n  const existingSource = existingSourcesByKey.get(domain);\n  const existingSourceFields = (existingSource && existingSource.fields) || {};\n  const computedSourceStatus = status === 'Active' || status === 'Needs review' ? 'Candidate' : 'Dormant';\n  const preservedSourceStatus = ['Approved', 'Rejected'].includes(existingSourceFields.Status)\n    ? existingSourceFields.Status\n    : computedSourceStatus;\n  const provider = candidate.provider || 'Manual';\n  const providerCostClass = provider === 'Direct'\n    ? 'Free direct HTTP'\n    : provider === 'Brave'\n      ? 'Low-cost search'\n      : 'Fallback search';\n  sourceRecordsByKey.set(domain, {\n    fields: {\n      'Source Key': domain,\n      'Source URL': 'https://' + domain,\n      Domain: domain,\n      'Source Type': sourceType(candidate.url),\n      Status: preservedSourceStatus,\n      Confidence: confidence,\n      'First Seen': existingSourceFields['First Seen'] || TODAY,\n      'Last Seen': TODAY,\n      ...(provider === 'Direct' ? { 'Last Direct Checked': TODAY } : { 'Last Discovery Checked': TODAY }),\n      'Discovery Provider': provider,\n      'Provider Cost Class': providerCostClass,\n      'Hit Count': Number(existingSourceFields['Hit Count'] || 0) + 1,\n    },\n  });\n  return domain;\n}\n\nfunction queueOpenCall(candidate, fields, deadline) {\n  const domain = fields.Source || domainOf(candidate.url);\n  const existingOpenCall = existingOpenCallsByCanonical.get(candidate.canonical)\n    || existingOpenCallsByFallback.get(fallbackKey(fields.Title, deadline, domain));\n  const existingOpenCallFields = (existingOpenCall && existingOpenCall.fields) || {};\n  const mergedFields = {\n    ...fields,\n    'First Seen': existingOpenCallFields['First Seen'] || TODAY,\n    'Last Checked': TODAY,\n  };\n  if (existingOpenCall) {\n    openCallUpdates.push({ id: existingOpenCall.id, fields: mergedFields });\n  } else {\n    openCallUpserts.push({ fields: mergedFields });\n  }\n}\n\nfunction queueNeedsReviewCandidate(candidate, reason) {\n  const domain = queueSource(candidate, 'Needs review', 0);\n  queueOpenCall(candidate, {\n    Title: truncate(candidate.title || candidate.url, 250),\n    URL: candidate.url,\n    'Canonical URL': candidate.canonical,\n    Summary: truncate(candidate.snippet || 'AI could not classify this candidate. Review the linked page manually.', 2000),\n    'Fee Status': 'Unknown',\n    'Submission Type': 'Unknown',\n    Source: domain,\n    Confidence: 0,\n    Status: 'Needs review',\n    'Rejection Reason': reason,\n  }, null);\n}\n\nfor (const candidate of candidates) {\n  if (aiDisabledReason) {\n    queueNeedsReviewCandidate(candidate, aiDisabledReason);\n    continue;\n  }\n  if (remainingRunMs() <= 15000 || aiRequestsUsed >= AI_MAX_REQUESTS_PER_RUN) {\n    aiDisabledReason = 'Skipped AI extraction because this n8n run reached its time/request budget. Review manually or rerun later.';\n    queueNeedsReviewCandidate(candidate, aiDisabledReason);\n    continue;\n  }\n  let pageText = await httpFallbackText(candidate.url);\n  if (!pageText && !candidate.snippet) {\n    rejected.push({ url: candidate.url, reason: 'No page text or useful snippet available' });\n    continue;\n  }\n\n  let extracted;\n  try {\n    extracted = await extractWithGemini(candidate, pageText || candidate.snippet);\n  } catch (error) {\n    const message = error.message || String(error);\n    if (message.includes('429') || message.toLowerCase().includes('rate limit')) {\n      aiRateLimitFailures += 1;\n      queueNeedsReviewCandidate(candidate, 'Gemini rate-limited this run. Review manually or rerun later.');\n      aiDisabledReason = 'Skipped Gemini extraction after a rate-limit response. Review manually or rerun later.';\n    } else {\n      queueNeedsReviewCandidate(candidate, 'Gemini extraction failed. Review manually. Error: ' + truncate(message, 500));\n    }\n    rejected.push({ url: candidate.url, reason: 'Gemini extraction failed: ' + message });\n    continue;\n  }\n\n  const deadline = normalizeDate(extracted.deadline);\n  const confidence = Math.max(0, Math.min(1, Number(extracted.confidence || 0)));\n  const isRelevant = extracted.is_photo_open_call === true && extracted.is_free === true && extracted.is_online_submission === true;\n  const isExpired = deadline ? isPastDate(deadline) : false;\n  let status = 'Rejected';\n  let rejectionReason = extracted.rejection_reason || '';\n\n  if (isRelevant && !isExpired && deadline && confidence >= CONFIRMED_THRESHOLD) {\n    status = 'Active';\n  } else if (isRelevant && !isExpired && (!deadline || confidence < CONFIRMED_THRESHOLD)) {\n    status = 'Needs review';\n    if (!deadline) rejectionReason = rejectionReason || 'Missing or unclear deadline';\n    if (confidence < CONFIRMED_THRESHOLD) rejectionReason = rejectionReason || 'Confidence below threshold';\n  } else if (isExpired) {\n    status = 'Expired';\n    rejectionReason = rejectionReason || 'Deadline is in the past';\n  } else {\n    rejectionReason = rejectionReason || 'Not a current free photography open call with online submission';\n  }\n\n  const domain = queueSource(candidate, status, confidence);\n\n  if (status === 'Rejected') {\n    rejected.push({ url: candidate.url, reason: rejectionReason });\n    continue;\n  }\n\n  const finalTitle = truncate(extracted.title || candidate.title || candidate.url, 250);\n  queueOpenCall(candidate, {\n      Title: finalTitle,\n      URL: candidate.url,\n      'Canonical URL': candidate.canonical,\n      ...(deadline ? { Deadline: deadline } : {}),\n      Summary: truncate(extracted.summary || candidate.snippet || '', 2000),\n      'Fee Status': extracted.fee_status || (extracted.is_free ? 'No required fee' : 'Unknown'),\n      'Submission Type': extracted.submission_type || 'Unknown',\n      Source: domain,\n      Confidence: confidence,\n      Status: status,\n      'Rejection Reason': rejectionReason,\n    }, deadline);\n}\n\nif (sourceRecordsByKey.size) {\n  await batchPatchSources([...sourceRecordsByKey.values()], 'Source Key');\n}\nif (openCallUpdates.length) {\n  await batchPatch('Open Calls', openCallUpdates);\n}\nif (openCallUpserts.length) {\n  await batchPatch('Open Calls', openCallUpserts, 'Canonical URL');\n}\n\nconst providerCounts = {};\nfor (const result of searchResults) {\n  const provider = result.provider || 'Unknown';\n  providerCounts[provider] = (providerCounts[provider] || 0) + 1;\n}\n\nreturn [{\n  json: {\n    ok: true,\n    date: TODAY,\n    discoveryMode: DISCOVERY_MODE,\n    discoveryRan: discoveryShouldRun,\n    discoveryQueryLimit: DISCOVERY_QUERY_LIMIT,\n    searchedQueries: discoveryShouldRun ? Math.min(DISCOVERY_QUERY_LIMIT, searchQueries.length) : 0,\n    activeSourcesChecked: activeSources.length,\n    rawResults: searchResults.length,\n    directSourceResults: directSourceResults.length,\n    discoveryResults: discoveryResults.length,\n    providerCounts,\n    uniqueCandidates: candidates.length,\n    savedOpenCalls: openCallUpdates.length + openCallUpserts.length,\n    updatedOpenCalls: openCallUpdates.length,\n    upsertedOpenCalls: openCallUpserts.length,\n    upsertedSources: sourceRecordsByKey.size,\n    expiredUpdated: expiredUpdates.length,\n    rejectedCount: rejected.length,\n    rejectedSample: rejected.slice(0, 10),\n    confidenceThreshold: CONFIRMED_THRESHOLD,\n    aiProvider: 'gemini',\n    model: AI_MODEL,\n    aiRateLimitFailures,\n    aiDisabledReason,\n    aiRequestsUsed,\n  },\n}];\n"
+      },
+      "id": "1b0abced-60dc-4470-a8d2-000000000003",
+      "name": "Find and Save Open Calls",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Open Calls Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 08:00": {
+      "main": [
+        [
+          {
+            "node": "Open Calls Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Calls Config": {
+      "main": [
+        [
+          {
+            "node": "Find and Save Open Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "",
+  "tags": []
+}

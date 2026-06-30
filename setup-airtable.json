@@ -1,0 +1,93 @@
+{
+  "name": "Setup Airtable - Photography Open Calls",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6b86f173-4e34-4c4e-a567-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "setup-airtable-api-key",
+              "name": "AIRTABLE_API_KEY",
+              "value": "PASTE_AIRTABLE_PERSONAL_ACCESS_TOKEN_HERE",
+              "type": "string"
+            },
+            {
+              "id": "setup-airtable-base-id",
+              "name": "AIRTABLE_BASE_ID",
+              "value": "PASTE_AIRTABLE_BASE_ID_HERE",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6b86f173-4e34-4c4e-a567-000000000003",
+      "name": "Airtable Setup Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst config = $input.first().json || {};\nconst required = ['AIRTABLE_API_KEY', 'AIRTABLE_BASE_ID'];\nconst missing = required.filter((name) => !config[name] || String(config[name]).startsWith('PASTE_'));\nif (missing.length) {\n  throw new Error('Fill these fields in the \"Airtable Setup Config\" node: ' + missing.join(', '));\n}\n\nconst AIRTABLE_API_KEY = config.AIRTABLE_API_KEY;\nconst AIRTABLE_BASE_ID = config.AIRTABLE_BASE_ID;\nconst META_BASE = 'https://api.airtable.com/v0/meta/bases/' + AIRTABLE_BASE_ID;\nconst httpRequest = this.helpers.httpRequest.bind(this);\n\nif (!/^app[a-zA-Z0-9]+$/.test(AIRTABLE_BASE_ID)) {\n  throw new Error('AIRTABLE_BASE_ID must be the Airtable base id from the base URL. It should start with \"app\", for example appXXXXXXXXXXXXXX. Current value: ' + AIRTABLE_BASE_ID);\n}\n\nconst schemas = [\n  {\n    name: 'Sources',\n    description: 'Discovered and approved source registry for photography open calls.',\n    fields: [\n      { name: 'Source Key', type: 'singleLineText' },\n      { name: 'Source URL', type: 'url' },\n      { name: 'Domain', type: 'singleLineText' },\n      { name: 'Source Type', type: 'singleSelect', options: { choices: [\n        { name: 'Search result' },\n        { name: 'Aggregator' },\n        { name: 'Museum' },\n        { name: 'Gallery' },\n        { name: 'Festival' },\n        { name: 'Social indexed' },\n        { name: 'Other' },\n      ] } },\n      { name: 'Status', type: 'singleSelect', options: { choices: [\n        { name: 'Candidate' },\n        { name: 'Approved' },\n        { name: 'Rejected' },\n        { name: 'Dormant' },\n      ] } },\n      { name: 'Confidence', type: 'number', options: { precision: 2 } },\n      { name: 'First Seen', type: 'date', options: { dateFormat: { name: 'iso' } } },\n      { name: 'Last Seen', type: 'date', options: { dateFormat: { name: 'iso' } } },\n      { name: 'Last Discovery Checked', type: 'date', options: { dateFormat: { name: 'iso' } } },\n      { name: 'Last Direct Checked', type: 'date', options: { dateFormat: { name: 'iso' } } },\n      { name: 'Discovery Provider', type: 'singleSelect', options: { choices: [\n        { name: 'Brave' },\n        { name: 'SerpAPI' },\n        { name: 'Tavily' },\n        { name: 'Direct' },\n        { name: 'Manual' },\n      ] } },\n      { name: 'Provider Cost Class', type: 'singleSelect', options: { choices: [\n        { name: 'Free direct HTTP' },\n        { name: 'Low-cost search' },\n        { name: 'Fallback search' },\n        { name: 'Avoid daily use' },\n      ] } },\n      { name: 'Hit Count', type: 'number', options: { precision: 0 } },\n      { name: 'Notes', type: 'multilineText' },\n    ],\n  },\n  {\n    name: 'Open Calls',\n    description: 'Daily discovered free photography open calls with online submission.',\n    fields: [\n      { name: 'Title', type: 'singleLineText' },\n      { name: 'URL', type: 'url' },\n      { name: 'Canonical URL', type: 'url' },\n      { name: 'Deadline', type: 'date', options: { dateFormat: { name: 'iso' } } },\n      { name: 'Summary', type: 'multilineText' },\n      { name: 'Fee Status', type: 'singleSelect', options: { choices: [\n        { name: 'Free' },\n        { name: 'No required fee' },\n        { name: 'Unknown' },\n        { name: 'Paid required fee' },\n      ] } },\n      { name: 'Submission Type', type: 'singleSelect', options: { choices: [\n        { name: 'Online' },\n        { name: 'Email' },\n        { name: 'Platform' },\n        { name: 'Unknown' },\n      ] } },\n      { name: 'Source', type: 'singleLineText' },\n      { name: 'Confidence', type: 'number', options: { precision: 2 } },\n      { name: 'Status', type: 'singleSelect', options: { choices: [\n        { name: 'Active' },\n        { name: 'Needs review' },\n        { name: 'Rejected' },\n        { name: 'Expired' },\n      ] } },\n      { name: 'First Seen', type: 'date', options: { dateFormat: { name: 'iso' } } },\n      { name: 'Last Checked', type: 'date', options: { dateFormat: { name: 'iso' } } },\n      { name: 'Rejection Reason', type: 'multilineText' },\n      { name: 'My Decision', type: 'singleSelect', options: { choices: [\n        { name: 'To review' },\n        { name: 'Apply' },\n        { name: 'Maybe' },\n        { name: 'Skip' },\n        { name: 'Applied' },\n      ] } },\n      { name: 'Notes', type: 'multilineText' },\n      { name: 'Priority', type: 'singleSelect', options: { choices: [\n        { name: 'High' },\n        { name: 'Medium' },\n        { name: 'Low' },\n      ] } },\n    ],\n  },\n];\n\nasync function airtableMeta(path, options = {}) {\n  const requestOptions = {\n    method: options.method || 'GET',\n    url: META_BASE + path,\n    headers: {\n      Authorization: 'Bearer ' + AIRTABLE_API_KEY,\n      'Content-Type': 'application/json',\n      ...(options.headers || {}),\n    },\n    json: true,\n  };\n  if (options.body) {\n    requestOptions.body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;\n  }\n  try {\n    return await httpRequest(requestOptions);\n  } catch (error) {\n    const hint = path === '/tables'\n      ? ' Check that AIRTABLE_BASE_ID is the base id from an opened Airtable base URL, and that the token has access to this base plus schema.bases:read and schema.bases:write scopes.'\n      : '';\n    throw new Error('Airtable metadata API failed for ' + path + ' on base ' + AIRTABLE_BASE_ID + ': ' + (error.message || String(error)) + hint);\n  }\n}\n\nfunction cleanField(field) {\n  const out = { name: field.name, type: field.type };\n  if (field.options) out.options = field.options;\n  return out;\n}\n\nlet tablesResponse = await airtableMeta('/tables', { method: 'GET' });\nconst actions = [];\n\nfor (const schema of schemas) {\n  let table = (tablesResponse.tables || []).find((candidate) => candidate.name === schema.name);\n  if (!table) {\n    const created = await airtableMeta('/tables', {\n      method: 'POST',\n      body: JSON.stringify({\n        name: schema.name,\n        description: schema.description,\n        fields: schema.fields.map(cleanField),\n      }),\n    });\n    actions.push('Created table ' + schema.name);\n    table = created;\n    tablesResponse = await airtableMeta('/tables', { method: 'GET' });\n  }\n\n  table = (tablesResponse.tables || []).find((candidate) => candidate.name === schema.name);\n  const existingFieldNames = new Set((table.fields || []).map((field) => field.name));\n  for (const field of schema.fields) {\n    if (existingFieldNames.has(field.name)) continue;\n    await airtableMeta('/tables/' + table.id + '/fields', {\n      method: 'POST',\n      body: JSON.stringify(cleanField(field)),\n    });\n    actions.push('Created field ' + schema.name + '.' + field.name);\n  }\n}\n\nif (!actions.length) actions.push('Airtable schema already matches expected setup');\n\nreturn [{\n  json: {\n    ok: true,\n    baseId: AIRTABLE_BASE_ID,\n    actions,\n    requiredTables: schemas.map((schema) => schema.name),\n  },\n}];\n"
+      },
+      "id": "6b86f173-4e34-4c4e-a567-000000000002",
+      "name": "Create or Validate Airtable Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Airtable Setup Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable Setup Config": {
+      "main": [
+        [
+          {
+            "node": "Create or Validate Airtable Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "",
+  "tags": []
+}

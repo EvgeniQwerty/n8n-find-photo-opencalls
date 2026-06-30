@@ -1,0 +1,23 @@
+.env
+.env.*
+!.env.example
+
+# n8n/local runtime artifacts
+.n8n/
+n8n-data/
+credentials*.json
+executions*.json
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+.DS_Store
+
+# Dependencies/build output if helper scripts are expanded later
+node_modules/
+dist/
+coverage/
+
+# Local workflow generator used during development; published repo keeps importable JSON only
+generate-workflows.mjs
