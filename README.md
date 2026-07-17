@@ -149,16 +149,3 @@ To avoid Tavily spend, leave `TAVILY_API_KEY` empty or keep `MIN_RESULTS_BEFORE_
 3. Import `daily-photo-open-calls.json`.
 4. Run it manually once and inspect the execution summary.
 5. Activate the workflow.
-
-## Security Notes
-
-- Do not commit real API keys.
-- The workflow JSON files contain placeholders only, such as `PASTE_GEMINI_API_KEY_HERE`.
-- If you export workflows from n8n after filling real keys into config nodes, do not commit those exports.
-- `.gitignore` excludes `.env`, local n8n data folders, credential dumps, execution dumps, logs, and common build artifacts.
-
-Recommended validation before publishing:
-
-```bash
-node -e "for (const f of ['setup-airtable.json','daily-photo-open-calls.json']) JSON.parse(require('fs').readFileSync(f, 'utf8')); console.log('workflow json ok')"
-```
